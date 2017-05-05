@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #-------------------------------------------------------------------------------
-# Copyright 2016 Congduc Pham, University of Pau, France.
+# Copyright 2017 Congduc Pham, University of Pau, France.
 # 
 # Congduc.Pham@univ-pau.fr
 #
@@ -40,8 +40,8 @@ then
 	echo "Will write 000000$macaddr into gateway_id.txt"
 	echo "000000$macaddr" > gateway_id.txt
 	echo "Done"
-	echo "Replacing gw id in local_conf.json"
-	sed -i -- 's/"000000.*"/"000000'"$macaddr"'"/g' local_conf.json
+	echo "Replacing gw id in gateway_conf.json"
+	sed -i -- 's/"000000.*"/"000000'"$macaddr"'"/g' gateway_conf.json
 	echo "Done"	
 fi
 
@@ -50,12 +50,13 @@ gatewayid=`cat gateway_id.txt`
 while [ "$choice" != "Q" ]
 do
 echo "=======================================* Gateway $gatewayid *==="
-echo "0- sudo python start_gw.py &                                         +"
+echo "0- sudo python start_gw.py & ; disown %1                             +"
 echo "1- sudo ./lora_gateway --mode 1                                      +"
-echo "2- sudo ./lora_gateway --mode 1|python post_processing_gw.py -t -m 2 +"
+echo "2- sudo ./lora_gateway --mode 1 | python post_processing_gw.py       +"
 echo "3- ps aux | grep -e start_gw -e lora_gateway -e post_proc -e log_gw  +"
 echo "4- tail --line=25 ../Dropbox/LoRa-test/post-processing_*.log         +"
 echo "5- tail --line=25 -f ../Dropbox/LoRa-test/post-processing_*.log      +"
+echo "6- less ../Dropbox/LoRa-test/post-processing_*.log                   +"
 echo "------------------------------------------------------* Bluetooth *--+"
 echo "a- run: sudo hciconfig hci0 piscan                                   +"
 echo "b- run: sudo python rfcomm-server.py                                 +"
@@ -64,13 +65,22 @@ echo "d- run: ps aux | grep rfcomm                                         +"
 echo "e- run: tail -f rfcomm.log                                           +"
 echo "---------------------------------------------------* Connectivity *--+"
 echo "f- test: ping www.univ-pau.fr                                        +"
+echo "--------------------------------------------------* Filtering msg *--+"
+echo "l- List LoRa reception indications                                   +"
+echo "m- List radio module reset indications                               +"
+echo "n- List boot indications                                             +"
+echo "o- List post-processing status                                       +"
+echo "p- List low-level gateway status                                     +"
 echo "--------------------------------------------------* Configuration *--+"
-echo "A- show global_conf.json                                             +"
-echo "B- show local_conf.json                                              +"
-echo "C- edit global_conf.json                                             +"
+echo "A- show gateway_conf.json                                            +"
+echo "B- edit gateway_conf.json                                            +"
+echo "C- show clouds.json                                                  +"
+echo "D- edit clouds.json                                                  +"
 echo "-----------------------------------------------------------* kill *--+"
 echo "K- kill all gateway related processes                                +"
 echo "k- kill rfcomm-server process                                        +"
+echo "R- reboot gateway                                                    +"
+echo "S- shutdown gateway                                                  +"
 echo "---------------------------------------------------------------------+"
 echo "Q- quit                                                              +"
 echo "======================================================================" 
@@ -96,7 +106,7 @@ fi
 if [ "$choice" = "2" ] 
 	then
 		echo "Running lora_gateway with post-processing... CTRL-C to exit" 
-		sudo ./lora_gateway --mode 1 | python post_processing_gw.py -t -m 2
+		sudo ./lora_gateway --mode 1 | python post_processing_gw.py
 fi
 
 if [ "$choice" = "3" ] 
@@ -124,6 +134,15 @@ if [ "$choice" = "5" ]
 		date --utc
 		trap "echo" SIGINT
 		tail --line=25 -f ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
+if [ "$choice" = "6" ] 
+	then
+		echo "Display ../Dropbox/LoRa-test/post-processing_$gatewayid.log. Q to return"
+		echo "Current UTC date is"
+		date --utc
+		trap "echo" SIGINT
+		less ../Dropbox/LoRa-test/post-processing_$gatewayid.log
 fi
 
 if [ "$choice" = "a" ] 
@@ -173,22 +192,68 @@ if [ "$choice" = "f" ]
 		ping www.univ-pau.fr
 fi
 
+if [ "$choice" = "l" ] 
+	then
+		echo "List LoRa reception indications"
+		grep "rxlora" ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
+if [ "$choice" = "m" ] 
+	then
+		echo "List radio module reset"
+		grep "Resetting radio module" ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
+if [ "$choice" = "n" ] 
+	then
+		echo "List boot indications"
+		grep "**********Power ON" ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
+if [ "$choice" = "o" ] 
+	then
+		echo "List post-processing status"
+		grep "post status: gw ON" ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
+if [ "$choice" = "p" ] 
+	then
+		echo "List low-level gateway status"
+		grep "Low-level gw status ON" ../Dropbox/LoRa-test/post-processing_$gatewayid.log
+fi
+
 if [ "$choice" = "A" ] 
         then
                 echo "Showing global_conf.json"
-                cat global_conf.json
+                cat gateway_conf.json
 fi
 
 if [ "$choice" = "B" ] 
         then
-                echo "Showing local_conf.json"
-                cat local_conf.json
+        		if [ -f gateway_conf.json ]
+        			then
+                		echo "Editing gateway_conf.json. CTRL-O to save, CTRL-X to return"
+                		nano gateway_conf.json
+                	else
+                		echo "Error: gateway_conf.json does not exist"
+                fi	
 fi
 
 if [ "$choice" = "C" ] 
         then
-                echo "Editing global_conf.json. CTRL-O to save, CTRL-X to return"
-                nano global_conf.json
+                echo "Showing clouds.json"
+                cat clouds.json
+fi
+
+if [ "$choice" = "D" ] 
+        then
+        		if [ -f clouds.json ]
+        			then
+                		echo "Editing clouds.json. CTRL-O to save, CTRL-X to return"
+                		nano clouds.json
+                	else
+                		echo "Error: clouds.json does not exist"
+                fi	
 fi
 
 if [ "$choice" = "K" ] 
@@ -201,6 +266,18 @@ if [ "$choice" = "k" ]
         then
 		echo "Killing rfcomm-server process"
 		sudo kill $(ps aux | grep -e rfcomm-server | awk '{print $2}')
+fi
+
+if [ "$choice" = "R" ] 
+        then
+		echo "Reboot gateway"
+		sudo shutdown -r now
+fi
+
+if [ "$choice" = "S" ] 
+        then
+		echo "Shutdown gateway"
+		sudo shutdown -h now
 fi
 
 echo "END OUTPUT"

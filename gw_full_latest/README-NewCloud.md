@@ -1,9 +1,5 @@
-Re-design of the cloud support module for the low-cost LoRa gateway
-===================================================================
-
-**IMPORTANT**: You should have the **advanced** version of the gateway. Then update it as described below if you want to use the new cloud management approach.
-
-WHY: The purpose of this update is to simplify cloud management with data upload on various clouds performed in a more generic manner.
+Cloud support module for the low-cost LoRa gateway
+==================================================
 
 Description 
 -----------
@@ -24,19 +20,17 @@ clouds.json contains a list of clouds where you want your data to be uploaded. H
 				"name":"ThingSpeak cloud",
 				"script":"python CloudThingSpeak.py",
 				"type":"iotcloud",			
-				"write_key":"",
 				"enabled":true
 			},
 			{	
 				"name":"GroveStreams cloud",
 				"script":"python CloudGroveStreams.py",
 				"type":"iotcloud",			
-				"write_key":"",
 				"enabled":true
 			}
 	}
 
-Note that storage on the local MongoDB is now declared as a cloud, among others that you can declare. You should not remove this cloud declaration and leave it in first position even if position has no matter. clouds.json is parsed by post_processing_gw.py using clouds_parser.py. For each cloud declaration, there are only 2 relevant fields: "script" and "enabled". "script" is used for you to provide the name of a script. You have also to indicate which launcher will be used. In this way, you can use several script languages (including shell scripts or executables provided that they read parameters that are passed by their command line). For instance, if the script is a python script, enter "python my_script_filename". "enabled" set to true indicates that you want this cloud to be active so that post_processing_gw.py will call the associated script to perform upload of the received data. All the other fields are not relevant for post_processing_gw.py but can be used by the associated script to get additional information that you may want to provide through the clouds.json file. Otherwise, you can always provide these additional information statically in the script.
+Note that storage on the local MongoDB is declared as a cloud, among others that you can declare. You should not remove this cloud declaration and leave it in first position even if position has no matter. clouds.json is parsed by post_processing_gw.py using clouds_parser.py. For each cloud declaration, there are only 2 relevant fields: "script" and "enabled". "script" is used for you to provide the name of a script. You have also to indicate which launcher will be used. In this way, you can use several script languages (including shell scripts or executables provided that they read parameters that are passed by their command line). For instance, if the script is a python script, enter "python my_script_filename". "enabled" set to true indicates that you want this cloud to be active so that post_processing_gw.py will call the associated script to perform upload of the received data. All the other fields are not relevant for post_processing_gw.py but can be used by the associated script to get additional information that you may want to provide through the clouds.json file. Otherwise, you can always provide these additional information statically in the script.
 
 When your script is launched, post_processing_gw.py provides 5 parameters. 
 
@@ -76,20 +70,20 @@ These parameters are passed to the script. It is up to the cloud script to use t
 		DO-WHATEVER-YOU-NEED-TO-DO-FOR-DATA-UPLOADING
 		
 		USE-PARAMETERS-AS-YOU-NEED
-	
+			
 	if __name__ == "__main__":
 		main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 
-The main changes in this new design approach are therefore:
+This cloud design approach allows for:
 
-- to have a very generic post_processing_gw.py script that handles the interface with the low-level lora_gateway program
-- to leave to the end-user the entire responsability (through a cloud script) to decode the raw data provided by the end-device
+- a very generic post_processing_gw.py script that handles the interface with the low-level lora_gateway program
+- the end-user to have the entire responsability (through a cloud script) to decode the raw data provided by the end-device
 
 Assuming that _enabled_clouds contains:
 
 	['python CloudThingSpeak.py', 'python CloudGroveStreams.py']
 
-The main data upload processing task in post_processing_gw.py is now very simple and looks like:
+The main data upload processing task in post_processing_gw.py is very simple and looks like:
 
 	ldata = getAllLine()
 	print "number of enabled clouds is %d" % len(_enabled_clouds)	
@@ -105,10 +99,66 @@ The main data upload processing task in post_processing_gw.py is now very simple
 		os.system(cmd_arg) 
 	print "--> cloud end"
 
-Good practice for storing keys
-------------------------------
+Good practice for storing keys or identification information
+------------------------------------------------------------
 
-Most of cloud platforms use some kind of keys for write access. These keys should be stored in a separate Python file so that updates on the cloud script can be realized independently from the existing keys (for instance if you already customized from a previous install). In the provided examples, key_FireBase.py, key_GroveStreams.py and key_ThingSpeak.py contain keys for their corresponding clouds. For instance, CloudThingSpeak.py starts with an "import key_ThingSpeak" statement. Only key_ThingSpeak.py has a usable key, which is our LoRa demo channel write key: SGSH52UGPVAUYG3S. For the other clouds, you have to create your own account in order to get your private key before being able to upload data to FireBase or GroveStreams.
+Most of cloud platforms use some kind of keys for write access. These keys should be stored in a separate Python file so that updates on the cloud script can be realized independently from the existing keys (for instance if you already customized from a previous install). In the provided examples, key_FireBase.py, key_GroveStreams.py and key_ThingSpeak.py contain keys for their corresponding clouds. For instance, CloudThingSpeak.py starts with an "import key_ThingSpeak" statement. Only key_ThingSpeak.py has a usable key, which is our LoRa demo channel write key: SGSH52UGPVAUYG3S. 
+
+	> cat key_ThingSpeak.py
+	# LoRa demo channel
+	_def_thingspeak_channel_key='SGSH52UGPVAUYG3S'
+
+For the other clouds, you have to create your own account in order to get your private key before being able to upload data to FireBase or GroveStreams.
+
+Indicate a list of allowed source addresses
+-------------------------------------------
+
+We also define in the key file a list of allowed device source address:
+
+	> cat key_ThingSpeak.py
+	# LoRa demo channel
+	_def_thingspeak_channel_key='SGSH52UGPVAUYG3S'
+	source_list=["3","10"]
+ 
+When source_list is set to [] then all device are accepted. If it specifies a list of device address, then the CloudThingSpeak.py will only upload data from these devices.
+
+The code of the CloudThingSpeak.py scripts looks like:
+
+	if (str(src) in key_ThingSpeak.source_list) or (len(key_ThingSpeak.source_list)==0):
+	
+		DO-WHATEVER-YOU-NEED-TO-DO-FOR-DATA-UPLOADING
+		
+		USE-PARAMETERS-AS-YOU-NEED
+	else:
+		print "Source is not is source list, not sending with CloudThingSpeak.py"
+		
+This feature is quite useful when you want to upload data to various different clouds, depending on the device. Suppose that you have 10 devices whose addresses are from 1 to 10. You want to upload data from sensors 1..5 to a ThingSpeak channel and data from sensors 6..10 to GroveStreams. Then you need to activate in clouds.json both clouds and specify in key_ThingSpeak.py source_list=["1","2","3","4","5"] and in key_GroveStreams.py source_list=["6","7","8","9","10"]. 
+
+Note that you can also upload to 2 different ThingSpeak channels by duplicating the CloudThingSpeak.py script into CloudThingSpeak_1.py, creating a new key_ThingSpeak_1.py file to store both the other ThingSpeak write key and source_list, changing in CloudThingSpeak_1.py the "import key_ThingSpeak" into "import key_ThingSpeak_1 as key_ThingSpeak" and then activating both CloudThingSpeak.py and CloudThingSpeak_1.py in clouds.json as follows:
+
+	{
+		"clouds" : [
+			{	
+				"notice":"do not remove the MongoDB cloud declaration, just change enabled and max_months_to_store if needed"
+				"name":"Local gateway MongoDB",
+				"script":"python CloudMongoDB.py",
+				"type":"database",
+				"max_months_to_store":2,
+				"enabled":false
+			},	
+			{	
+				"name":"ThingSpeak cloud",
+				"script":"python CloudThingSpeak.py",
+				"type":"iotcloud",			
+				"enabled":true
+			},
+				"name":"ThingSpeak cloud",
+				"script":"python CloudThingSpeak_1.py",
+				"type":"iotcloud",			
+				"enabled":true
+			}
+	}
+		
 
 Some words about data format
 ----------------------------
@@ -171,53 +221,7 @@ As indicated previously, local storage of incoming data in the local MongoDB dat
 	MongoDB: 0 documents deleted
 	MongoDB: saving the document in the collection...
 	MongoDB: saving done
-
-List of new files
-=================
-
-- cloud_parser.py: parses the cloud declarations
-- clouds.json: cloud declaration in json format
-- CloudMongoDB.py: script to handle local storage of received data on MongoDB, following the new cloud approach
-- CloudFireBase.py: updated to support new design
-- CloudGrovestreams.py: updated to support new design
-- CloudThingSpeak.py: updated to support new design
-- key_FireBase.py, key_GroveStreams.py and key_ThingSpeak.py: contain keys for the corresponding clouds
-- scripts/new_config_gw.sh: updated as some configuration fields have been moved from one file to another
-- README-NewCloud.md: this README file
-
-Files that will be updated
-==========================
-
-- global_conf.json: there are no more cloud related information in this file
-- local_conf.json: a field indicates whether values from the embedded DHT22 sensor will be saved on MongoDB or not
-- post_processing_gw.py: no more command line parameters for clouds, will parse clouds.json and loop over all enabled clouds
-- start_gw.py: no need to look at cloud information in global_conf.json anymore
-- scripts/config_gw.sh: updated as some configuration fields have been moved from one file to another
 	
-Files that will be obsoleted (not used anymore)
-===============================================
-
-- scripts/config_gw.sh: (replaced by new_config_gw.sh)
-- FireBase.py (replaced by CloudFireBase.py)
-- Grovestreams.py (replaced by CloudGrovestreams.py)
-- ThingSpeak.py (replaced by CloudThingSpeak.py)
-- SensorCloud.py (we do not support SensorCloud anymore)
-
-How to update your gateway
-==========================
-
-Copy all the files of the new_cloud_design folder into your lora_gateway folder (which normally is on your Raspberry). Use scp as follow if you want:
-
-	cd new_cloud_design
-	scp -r * pi@my_gw_ip_addr:/home/pi/lora_gateway
-	
-Go into the script folder (on your raspberry gateway) and run new_config_gw (see README.md in gw_advanced folder)
-		
-If you have custom cloud information (url, write key,...) in your old python script, report them back in the Cloud*.py files. Edit clouds.json to enable/disable clouds. By default, only ThingSpeak cloud is enabled because the CloudThingSpeak.py script already has a demo ThingSpeak channel write key. To enable other clouds (Grovestreams, Firebase) create free accounts on these platforms and fill-in login/credential informations into the corresponding cloud script example.
-
-If you have custom cloud platforms (other than the provided examples) then look at the provided examples to see how you can create (or port) a new cloud script for these cloud platforms.
-
-
 Enjoy!
 C. Pham	
 	

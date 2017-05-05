@@ -9,6 +9,22 @@
 			"enabled":false
 		},
 		{	
+			"name":"SMS Service",
+			"script":"python CloudSMS.py",
+			"type":"smsservice",
+			"gammurc_file":"/home/pi/.gammurc",
+			"enabled":false,
+			"always_enabled":false
+		},	
+		{	
+			"name":"WAZIUP SMS Service ",
+			"script":"python CloudWAZIUP_SMS.py",
+			"type":"smsservice",
+			"gammurc_file":"/home/pi/.gammurc",
+			"enabled":false,
+			"always_enabled":false
+		},		
+		{	
 			"name":"WAZIUP Orion cloud",
 			"script":"python CloudWAZIUP.py",
 			"type":"iotcloud",			
