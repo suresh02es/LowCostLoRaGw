@@ -47,8 +47,11 @@
 #define W_REQUESTED_ACK
 //#define W_NET_KEY
 //#define W_INITIALIZATION
-#define SX1272_RST  3
 
+// Optimising for MEGA
+#define SX1272_RST  22
+#define SX1272_SS   53
+/*
 #if defined ARDUINO_AVR_PRO || defined ARDUINO_AVR_NANO || defined ARDUINO_AVR_MICRO || defined ARDUINO_AVR_MINI \
 || defined __MK20DX256__ || defined __MKL26Z64__
 #define SX1272_SS 10
@@ -60,7 +63,7 @@
 #else
 #define SX1272_SS 2
 #endif
-
+*/
 #define SX1272Chip  0
 #define SX1276Chip  1
 // end
